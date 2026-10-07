@@ -5,6 +5,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
 
 def evaluate(model, X_test, y_test):
     fraud_probabilities = model.predict_proba(X_test)[:,1]
@@ -43,3 +44,13 @@ if __name__ == "__main__":
 
     model3.fit(X_train, y_train)
     evaluate(model3, X_test, y_test)
+
+    print("======XGBoost======")
+    legit = (y_train==0).sum()
+    fraud = (y_train==1).sum()
+
+    scale_pos_weight = legit/fraud
+    model4 = XGBClassifier(scale_pos_weight=scale_pos_weight, random_state=42)
+
+    model4.fit(X_train, y_train)
+    evaluate(model4, X_test, y_test)
