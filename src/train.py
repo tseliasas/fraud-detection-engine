@@ -6,6 +6,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
+from sklearn.model_selection import train_test_split
 
 def evaluate(model, X_test, y_test):
     fraud_probabilities = model.predict_proba(X_test)[:,1]
@@ -46,11 +47,14 @@ if __name__ == "__main__":
     evaluate(model3, X_test, y_test)
 
     print("======XGBoost======")
-    legit = (y_train==0).sum()
-    fraud = (y_train==1).sum()
+
+    X_tr, X_val, y_tr, y_val = train_test_split(X_train, y_train, test_size=0.25, random_state=42, stratify=y_train)
+
+    legit = (y_tr==0).sum()
+    fraud = (y_tr==1).sum()
 
     scale_pos_weight = legit/fraud
     model4 = XGBClassifier(scale_pos_weight=scale_pos_weight, random_state=42)
 
-    model4.fit(X_train, y_train)
+    model4.fit(X_tr, y_tr)
     evaluate(model4, X_test, y_test)
