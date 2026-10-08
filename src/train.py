@@ -10,6 +10,8 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 from imblearn.pipeline import Pipeline as ImbPipeline
 from imblearn.over_sampling import SMOTE
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+
 
 def evaluate(model, X_test, y_test, threshold=0.5):
     fraud_probabilities = model.predict_proba(X_test)[:,1]
@@ -34,6 +36,12 @@ def find_threshold(y_true, probabilities, min_recall):
     best = np.argmax(good_precision)
 
     return good_thresholds[best]
+
+def cv_score(name, model, X, y):
+    folds  = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    scores = cross_val_score(model, X, y, cv=folds, scoring="average_precision")
+    print(name, "PR-AUC:", scores.mean(), "±", scores.std())
+
 
 if __name__ == "__main__":
     df = load_data("../data/raw/creditcard.csv")
@@ -96,3 +104,8 @@ if __name__ == "__main__":
 
     smote_model.fit(X_tr, y_tr)
     evaluate(smote_model, X_val, y_val)
+
+    print("======Cross-validation======")
+    cv_score("XGBoost (weights)", model4, X_train, y_train)
+    cv_score("XGBoost (SMOTE)  ", smote_model, X_train, y_train)
+
