@@ -1,21 +1,37 @@
 from data_prep import load_data, clean, split
 from sklearn.dummy import DummyClassifier
-from sklearn.metrics import average_precision_score, recall_score, precision_score, confusion_matrix
+from sklearn.metrics import average_precision_score, recall_score, precision_score, confusion_matrix, precision_recall_curve
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
+import numpy as np
 
-def evaluate(model, X_test, y_test):
+def evaluate(model, X_test, y_test, threshold=0.5):
     fraud_probabilities = model.predict_proba(X_test)[:,1]
-    predictions         = model.predict(X_test)
+    predictions         = (fraud_probabilities>=threshold).astype(int)
 
     print("PR-AUC:   ", average_precision_score(y_test, fraud_probabilities))
     print("Recall:   ", recall_score(y_test, predictions))
     print("Precision:", precision_score(y_test, predictions))
     print(confusion_matrix(y_test, predictions))
+
+def find_threshold(y_true, probabilities, min_recall):
+    precision, recall, thresholds = precision_recall_curve(y_true, probabilities)
+
+    precision = precision[:-1]
+    recall = recall[:-1]
+
+    passes = recall >= min_recall
+
+    good_precision = precision[passes]
+    good_thresholds = thresholds[passes]
+
+    best = np.argmax(good_precision)
+
+    return good_thresholds[best]
 
 if __name__ == "__main__":
     df = load_data("../data/raw/creditcard.csv")
@@ -52,9 +68,20 @@ if __name__ == "__main__":
 
     legit = (y_tr==0).sum()
     fraud = (y_tr==1).sum()
-
+    
     scale_pos_weight = legit/fraud
+
     model4 = XGBClassifier(scale_pos_weight=scale_pos_weight, random_state=42)
 
     model4.fit(X_tr, y_tr)
     evaluate(model4, X_test, y_test)
+
+    val_probabilities = model4.predict_proba(X_val)[ :, 1 ]
+    threshold = find_threshold(y_val, val_probabilities, 0.85)
+    print("Chosen threshold:", threshold)
+
+    print("======XGBoost @ tuned threshold======")
+
+    evaluate(model4, X_test, y_test, threshold)
+
+    
