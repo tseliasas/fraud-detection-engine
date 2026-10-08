@@ -8,6 +8,8 @@ from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
 import numpy as np
+from imblearn.pipeline import Pipeline as ImbPipeline
+from imblearn.over_sampling import SMOTE
 
 def evaluate(model, X_test, y_test, threshold=0.5):
     fraud_probabilities = model.predict_proba(X_test)[:,1]
@@ -81,7 +83,16 @@ if __name__ == "__main__":
     print("Chosen threshold:", threshold)
 
     print("======XGBoost @ tuned threshold======")
-
     evaluate(model4, X_test, y_test, threshold)
 
-    
+    print("======XGBoost (weights) - validation======")
+    evaluate(model4, X_val, y_val)
+
+    print("======XGBoost (SMOTE) - validation======")
+    smote_model = ImbPipeline([
+        ("smote", SMOTE(random_state=42)),
+        ("model", XGBClassifier(random_state=42))
+    ])
+
+    smote_model.fit(X_tr, y_tr)
+    evaluate(smote_model, X_val, y_val)
