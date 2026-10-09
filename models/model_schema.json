@@ -1,0 +1,46 @@
+{
+  "model_file": "fraud_model.onnx",
+  "input_name": "input",
+  "version": "1.0.0",
+  "features": [
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+    "V7",
+    "V8",
+    "V9",
+    "V10",
+    "V11",
+    "V12",
+    "V13",
+    "V14",
+    "V15",
+    "V16",
+    "V17",
+    "V18",
+    "V19",
+    "V20",
+    "V21",
+    "V22",
+    "V23",
+    "V24",
+    "V25",
+    "V26",
+    "V27",
+    "V28",
+    "Amount",
+    "hour"
+  ],
+  "threshold": 0.9152014255523682,
+  "feature_engineering": {
+    "hour": "Hour of day (0-23) of the transaction's local time, e.g. 15:47 -> 15. Send as a float, last in the feature list."
+  },
+  "metrics": {
+    "pr_auc": 0.822,
+    "recall": 0.747,
+    "precision": 0.959
+  }
+}

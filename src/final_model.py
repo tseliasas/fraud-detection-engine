@@ -6,6 +6,7 @@ import onnxmltools
 from onnxmltools.convert.common.data_types import FloatTensorType
 import onnxruntime as rt
 import numpy as np
+import json
 
 MIN_RECALL = 0.80
 
@@ -52,3 +53,24 @@ if __name__ == "__main__":
     python_probabilities = model.predict_proba(X_test.to_numpy())[:, 1]
     max_difference = np.abs(onnx_probabilities - python_probabilities).max()
     print("Max difference:", max_difference)
+
+    schema = {
+        "model_file": "fraud_model.onnx",
+        "input_name": "input",
+        "version": "1.0.0",
+        "features": X_train.columns.tolist(),
+        "threshold": float(threshold),
+        "feature_engineering": {
+            "hour": "Hour of day (0-23) of the transaction's local time, e.g. 15:47 -> 15. Send as a float, last in the feature list."
+        },
+        "metrics": {
+            "pr_auc": 0.822,
+            "recall": 0.747,
+            "precision": 0.959
+        }
+    }
+
+    with open("../models/model_schema.json", "w") as f:
+        json.dump(schema, f, indent=2)
+
+    print("Saved schema")
