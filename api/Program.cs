@@ -29,11 +29,12 @@ var session   = new InferenceSession(modelPath);
 
 if (!session.InputMetadata.ContainsKey(schema.InputName))
     throw new InvalidOperationException($"ONNX model has no input named '{schema.InputName}'.");
-if (!session.OutputMetadata.ContainsKey("probabilities"))
-    throw new InvalidOperationException("ONNX model has no output named 'probabilities'.");
+if (!session.OutputMetadata.ContainsKey(FraudPredictor.ProbabilitiesOutput))
+    throw new InvalidOperationException($"ONNX model has no output named '{FraudPredictor.ProbabilitiesOutput}'.");
 
 // Loading the model is slow, so do it once and share it across requests
 builder.Services.AddSingleton(session);
+builder.Services.AddSingleton<FraudPredictor>();
 
 var app = builder.Build();
 
@@ -47,5 +48,14 @@ app.UseHttpsRedirection();
 
 app.MapGet("/health", () => new { status = "ok" });
 app.MapGet("/model-info", (ModelSchema s) => s);
+
+app.MapPost("/predict", (PredictRequest request, FraudPredictor predictor) =>
+{
+    var missing = predictor.FindMissingFeatures(request);
+    if (missing.Count > 0)
+        return Results.BadRequest(new { error = "Missing features", missing });
+
+    return Results.Ok(predictor.Predict(request));
+});
 
 app.Run();
