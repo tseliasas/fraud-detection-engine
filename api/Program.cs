@@ -36,6 +36,13 @@ if (!session.OutputMetadata.ContainsKey(FraudPredictor.ProbabilitiesOutput))
 builder.Services.AddSingleton(session);
 builder.Services.AddSingleton<FraudPredictor>();
 
+// --- CORS ---
+// Browsers block a page on one origin (the dashboard) from calling another (this API) unless allowed
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options =>
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(allowedOrigins).AllowAnyHeader().WithMethods("GET", "POST")));
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -45,6 +52,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors();
 
 app.MapGet("/health", () => new { status = "ok" });
 app.MapGet("/model-info", (ModelSchema s) => s);
