@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.ML.OnnxRuntime;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,20 @@ if (schema.Threshold <= 0 || schema.Threshold >= 1)
     throw new InvalidOperationException($"Model threshold {schema.Threshold} must be between 0 and 1.");
 
 builder.Services.AddSingleton(schema);
+
+// --- ONNX model ---
+// The schema names the model file; it lives next to the schema
+var modelDir  = Path.GetDirectoryName(schemaPath)!;
+var modelPath = Path.Combine(modelDir, schema.ModelFile);
+var session   = new InferenceSession(modelPath);
+
+if (!session.InputMetadata.ContainsKey(schema.InputName))
+    throw new InvalidOperationException($"ONNX model has no input named '{schema.InputName}'.");
+if (!session.OutputMetadata.ContainsKey("probabilities"))
+    throw new InvalidOperationException("ONNX model has no output named 'probabilities'.");
+
+// Loading the model is slow, so do it once and share it across requests
+builder.Services.AddSingleton(session);
 
 var app = builder.Build();
 
