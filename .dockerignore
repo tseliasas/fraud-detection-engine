@@ -1,0 +1,28 @@
+# Build context is the repo root; the API image only needs api/ and models/
+
+# Version control and editor files
+.git/
+.gitignore
+.vscode/
+CLAUDE.md
+**/*.md
+
+# Python side (training only)
+venv/
+data/
+src/
+notebooks/
+reports/
+requirements.txt
+**/__pycache__/
+
+# Dashboard (built separately)
+dashboard/
+
+# Local .NET build output (Windows-specific, rebuilt inside the image)
+api/bin/
+api/obj/
+
+# Secrets and local settings
+**/.env
+**/.env.*
