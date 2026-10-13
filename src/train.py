@@ -13,6 +13,7 @@ from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 
 
+# Print model scores
 def evaluate(model, X_test, y_test, threshold=0.5):
     fraud_probabilities = model.predict_proba(X_test)[:,1]
     predictions         = (fraud_probabilities>=threshold).astype(int)
@@ -22,6 +23,7 @@ def evaluate(model, X_test, y_test, threshold=0.5):
     print("Precision:", precision_score(y_test, predictions))
     print(confusion_matrix(y_test, predictions))
 
+# Best threshold for recall
 def find_threshold(y_true, probabilities, min_recall):
     precision, recall, thresholds = precision_recall_curve(y_true, probabilities)
 
@@ -37,6 +39,7 @@ def find_threshold(y_true, probabilities, min_recall):
 
     return good_thresholds[best]
 
+# Cross-validated PR-AUC
 def cv_score(name, model, X, y):
     folds  = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     scores = cross_val_score(model, X, y, cv=folds, scoring="average_precision")

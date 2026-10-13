@@ -8,6 +8,7 @@ LEGIT_PER_FRAUD = 20
 SEED = 42
 OUTPUT_PATH = "../dashboard/public/demo_transactions.json"
 
+# Pick and shuffle demo rows
 def build_demo_set(X_test, y_test):
     frauds = X_test[y_test == 1]
     legit  = X_test[y_test == 0].sample(len(frauds) * LEGIT_PER_FRAUD, random_state=SEED)
@@ -15,6 +16,7 @@ def build_demo_set(X_test, y_test):
     demo = pd.concat([frauds.assign(actualFraud=True), legit.assign(actualFraud=False)])
     return demo.sample(frac=1, random_state=SEED)
 
+# Convert rows to JSON
 def to_records(demo):
     # The API computes hour from the live timestamp, so it isn't sent as a feature
     feature_columns = [c for c in demo.columns if c not in ("hour", "actualFraud")]

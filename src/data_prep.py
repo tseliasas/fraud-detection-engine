@@ -1,6 +1,7 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+# Read the raw CSV
 def load_data(path):
     df = pd.read_csv(path)
 
@@ -9,6 +10,7 @@ def load_data(path):
 SECONDS_PER_DAY = 86400
 SECONDS_PER_HOUR = 3600
 
+# Dedupe and add hour
 def clean(df):
     # Drop exact copies so they can't leak across the train/test split
     df = df.drop_duplicates()
@@ -19,6 +21,7 @@ def clean(df):
 
     return df
 
+# Stratified train/test split
 def split(df, test_size, seed):
     X = df.drop(columns="Class")
     y = df["Class"]
