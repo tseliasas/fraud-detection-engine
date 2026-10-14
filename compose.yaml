@@ -1,0 +1,19 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "${API_PORT:-5260}:8080"
+    environment:
+      Cors__AllowedOrigins__0: http://localhost:${DASHBOARD_PORT:-3000}
+
+  dashboard:
+    build:
+      context: dashboard
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-5260}
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    depends_on:
+      - api
