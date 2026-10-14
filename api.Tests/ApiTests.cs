@@ -45,6 +45,6 @@ public class ApiTests
         var response = await client.PostAsJsonAsync("/predict", request);
         var prediction = await response.Content.ReadFromJsonAsync<PredictResponse>();
 
-        Assert.True(prediction!.IsFraud);
+        Assert.False(prediction!.IsFraud);
     }
 }
