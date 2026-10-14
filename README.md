@@ -1,5 +1,7 @@
 # Fraud Detection Engine
 
+[![CI](https://github.com/tseliasas/fraud-detection-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/tseliasas/fraud-detection-engine/actions/workflows/ci.yml)
+
 A credit card fraud detector built end to end: a model trained in Python, served by a C# API, and watched live on a Next.js dashboard.
 
 You give it a transaction, and it tells you how likely it is to be fraud and whether it should be flagged. That takes about a millisecond.
@@ -107,7 +109,32 @@ Every probability on the screen is computed live by the model through the API. S
 
 ## Try it
 
-You need the [.NET 10 SDK](https://dotnet.microsoft.com/download) and [Node.js](https://nodejs.org) 20 or newer. You don't need Python or the dataset just to run it, since the trained model and the demo transactions are already in the repo.
+You don't need Python or the dataset just to run it, since the trained model and the demo transactions are already in the repo.
+
+### With Docker (easiest)
+
+All you need is [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+```
+git clone https://github.com/tseliasas/fraud-detection-engine.git
+cd fraud-detection-engine
+docker compose up --build
+```
+
+The first build takes a few minutes because it downloads the .NET and Node images. After that, open http://localhost:3000.
+
+The API runs on port 5260 and the dashboard on 3000. If either port is taken on your machine, pick different ones:
+
+```
+API_PORT=5300 DASHBOARD_PORT=3100 docker compose up --build              # Mac / Linux
+$env:API_PORT=5300; $env:DASHBOARD_PORT=3100; docker compose up --build  # Windows PowerShell
+```
+
+The dashboard and the API's CORS setting both follow those variables, so nothing else needs changing.
+
+### Without Docker
+
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download) and [Node.js](https://nodejs.org) 20 or newer.
 
 ```
 git clone https://github.com/tseliasas/fraud-detection-engine.git
@@ -129,13 +156,27 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. You should see a green "API online" dot and a new transaction every second. The first flagged fraud shows up within about a minute. Set the speed to 10x to get through a few hundred and watch recall and precision settle.
+Open http://localhost:3000.
+
+### What you should see
+
+A green "API online" dot and a new transaction every second. The first flagged fraud shows up within about a minute. Set the speed to 10x to get through a few hundred and watch recall and precision settle.
 
 Other things to try:
 
-- Open http://localhost:5259/model-info to see what the API loaded.
+- Open http://localhost:5260/model-info (Docker) or http://localhost:5259/model-info (without Docker) to see what the API loaded.
 - Open `api/FraudApi.http` in VS Code with the REST Client extension. It has ready-made legit, fraud and missing-feature requests.
 - Stop the API while the dashboard is running. You get a red banner, and the feed picks back up by itself when the API comes back.
+
+## Tests and CI
+
+`api.Tests/` starts the real API in memory and checks two things: `/health` answers, and a known fraud from the test set gets flagged by `/predict`. The second one covers the whole chain (schema, model file, feature order and threshold), so if any of those break, it fails.
+
+```
+dotnet test api.Tests
+```
+
+GitHub Actions runs those tests and builds both Docker images on every push to `main`. I checked that it actually catches problems by pushing a deliberately broken test: the run went red at the test step and skipped the build.
 
 ## Rebuild the model yourself
 
@@ -174,8 +215,11 @@ fraud-detection-engine/
 ├── models/
 │   ├── fraud_model.onnx          the trained model
 │   └── model_schema.json         the contract between Python and C#
-├── api/                          C# inference API
-└── dashboard/                    Next.js live dashboard
+├── api/                          C# inference API (+ Dockerfile)
+├── api.Tests/                    xUnit tests for the API
+├── dashboard/                    Next.js live dashboard (+ Dockerfile)
+├── compose.yaml                  runs the API and dashboard together
+└── .github/workflows/ci.yml      tests + Docker builds on every push
 ```
 
 ## Limitations
@@ -187,4 +231,4 @@ fraud-detection-engine/
 
 ## Tech stack
 
-Python, pandas, scikit-learn, imbalanced-learn, XGBoost, ONNX, C# / ASP.NET Core (.NET 10), ONNX Runtime, Next.js, React, TypeScript, Tailwind CSS
+Python, pandas, scikit-learn, imbalanced-learn, XGBoost, ONNX, C# / ASP.NET Core (.NET 10), ONNX Runtime, xUnit, Next.js, React, TypeScript, Tailwind CSS, Docker, Docker Compose, GitHub Actions
