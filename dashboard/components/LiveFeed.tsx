@@ -69,7 +69,7 @@ export default function LiveFeed({ feed }: { feed: FeedItem[] }) {
                     <td className="px-4 py-2">
                       {flagged ? (
                         <span className="rounded bg-red-500/20 px-2 py-0.5 text-xs font-semibold text-red-400">
-                          🚨 FLAGGED
+                          FLAGGED
                         </span>
                       ) : (
                         <span className="text-xs text-zinc-500">ok</span>
