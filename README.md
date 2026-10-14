@@ -21,6 +21,10 @@ Scored once on a held-out test set of 56,746 transactions the model never saw:
 
 So when it flags something, it's almost always right. It misses about a quarter of fraud, and I explain why further down.
 
+<img src="docs/confusion_matrix.png" alt="Confusion matrix on the test set" width="480">
+
+Out of 56,651 legit transactions, 56,648 went through untouched. That's 99.99%.
+
 ## How it works
 
 The project is three separate pieces that hand off to each other:
@@ -44,27 +48,67 @@ Built on the [Kaggle Credit Card Fraud dataset](https://www.kaggle.com/datasets/
 
 The main problem is that fraud is only 0.17% of the data. A model that says "not fraud" every single time gets 99.83% accuracy and catches a crisp zero frauds. So accuracy is useless here, and everything is measured with **PR-AUC**, **recall** and **precision** instead.
 
+![Class imbalance](docs/class_imbalance.png)
+
 What I found in the EDA and what I did about it:
 
-- **Imbalance:** 1 fraud per 578 legit transactions. Handled with XGBoost's `scale_pos_weight` and a stratified split so the test set keeps the same fraud rate.
+- **Imbalance:** 1 fraud per 578 legit transactions (that's what the tiny bar above is). Handled with XGBoost's `scale_pos_weight` and a stratified split so the test set keeps the same fraud rate.
 - **Duplicates:** 1,081 exact duplicate rows (19 of them fraud). Dropped before splitting, otherwise copies leak into the test set and inflate the score.
 - **Time:** the raw `Time` column is "seconds since the first transaction," which means nothing for a live transaction. The transaction volume dips around 4 AM, which puts the start at about midnight, so I turned it into an **hour of day** feature. Legit volume drops at night but fraud doesn't, which is why the feature is worth keeping.
 - **Scaling:** the V-features are already on a small scale from PCA, but `Amount` goes up to about 25,000, so `Amount` and `hour` needed scaling for logistic regression. XGBoost doesn't care.
 
-I compared models the way you'd climb a ladder, where each step has to beat the last one:
+![Fraud vs legit by hour of day](docs/fraud_by_hour.png)
 
-| Model | PR-AUC (test) |
-|---|---|
-| Always say "not fraud" | 0.0017 |
-| Logistic regression (unscaled) | 0.655 |
-| Logistic regression (scaled) | 0.671 |
-| **XGBoost (class weights)** | **0.822** |
+Only 8.4% of legit transactions happen between midnight and 6 AM, but 24.3% of fraud does. That's about 3 times the share, and it's the evidence for keeping `hour`. The spikes in the fraud line are worth being careful about though: with only 2 days of data, a spike could just be one attacker running a burst.
 
-I also tried SMOTE against class weights. On a single validation set SMOTE looked better, but 5-fold cross-validation showed it was just noise (0.849 ± 0.027 vs 0.846 ± 0.031). I went with class weights because it gave a lot fewer false alarms and a simpler export.
+## Experiments
 
-The decision threshold (0.915) was picked from out-of-fold predictions across all 378 training frauds, targeting 80% recall. On the test set it gave 74.7%. That gap is within the noise cross-validation showed, and the test set just happens to have slightly harder frauds. The bigger reason recall tops out around 75% is that the frauds it misses get probabilities near zero. They look completely normal to the model, so lowering the threshold doesn't really help.
+### The model ladder
+
+I compared models the way you'd climb a ladder, where each step has to beat the last one. The first step is a "model" that always says "not fraud", so anything that can't beat it hasn't learned anything.
+
+![PR-AUC for each model](docs/model_ladder.png)
+
+- **Logistic regression** jumps from 0.002 to 0.655 straight away. Scaling `Amount` and `hour` only adds a little (0.671), because 28 of the 30 features were already scaled by PCA. It mainly fixed a convergence warning and cut false alarms from 1,658 to 1,420.
+- **XGBoost** gets to 0.822. Logistic regression can only draw one straight line between fraud and legit. XGBoost builds a few hundred small decision trees, so it can pick up combinations like "this V14 value *and* this amount".
+
+PR-AUC is one number for the whole curve. Here's the curve itself:
+
+![Precision-recall curves](docs/pr_curves.png)
+
+Every point on a line is one possible threshold. Moving right catches more fraud (recall), moving down means more of the alerts are false (precision). XGBoost stays near the top much longer than logistic regression does. The dot is the threshold I actually use. After about 80% recall both lines fall off a cliff, which is the "confidently missed" fraud described further down.
+
+### Cross-validation: class weights vs SMOTE
+
+There are two common ways to deal with imbalance:
+
+- **Class weights:** tell the model a missed fraud costs about 600 times more than a missed legit transaction.
+- **SMOTE:** make up synthetic fraud examples by blending real ones together, until the training data is balanced.
+
+On a single validation set, SMOTE scored 0.887 against 0.875 for class weights. That looks like a win, but the validation set only had 94 frauds, and the same model scored 0.875 on validation and 0.821 on test. A 0.05 swing from nothing but which frauds landed where. So a 0.012 gap could easily be luck.
+
+**Cross-validation** is how you check. The training data gets split into 5 parts (folds). The model trains on 4 of them and gets scored on the 5th, and that repeats 5 times so every fold gets a turn as the test. Every one of the 378 training frauds gets scored once, and you end up with 5 scores instead of 1, so you can see how much the score moves around on its own.
+
+![Cross-validation results](docs/cross_validation.png)
+
+| | Fold 1 | Fold 2 | Fold 3 | Fold 4 | Fold 5 | Mean ± std |
+|---|---|---|---|---|---|---|
+| Class weights | 0.822 | 0.868 | 0.809 | 0.867 | 0.860 | 0.845 ± 0.025 |
+| SMOTE | 0.839 | 0.863 | 0.801 | 0.877 | 0.865 | 0.849 ± 0.027 |
+
+The difference between the means is 0.004. The spread inside each method is about 0.025, roughly 6 times bigger. The bands overlap almost completely, so there's no real winner on PR-AUC. I went with class weights because it gave 6 false alarms on validation against SMOTE's 19, it has fewer moving parts, and SMOTE would have to be stripped out of the pipeline before exporting to ONNX anyway.
+
+SMOTE is also easy to get wrong: if you run it on the whole dataset before splitting, synthetic frauds end up as near-copies of real test frauds and the score lies to you. Here it runs inside an `imblearn` pipeline, so it only ever touches the training folds.
+
+### Picking the threshold
+
+The model outputs a probability, and 0.5 isn't special. I picked the threshold from **out-of-fold** predictions: during cross-validation, every training transaction gets predicted by the one model that didn't train on it, so all 378 training frauds can be used for tuning without touching the test set. Asking for at least 80% recall with the best precision gave **0.915**.
+
+On the test set it gave 74.7% recall instead of 80%. That gap is within the noise cross-validation showed, and the test set just happens to have slightly harder frauds. The bigger reason recall tops out around 75% is that the frauds it misses get probabilities near zero. They look completely normal to the model, so lowering the threshold doesn't really help: even at 0.05 it only reaches about 81%.
 
 The final model is exported to ONNX and checked against Python's predictions (max difference 9.3e-08).
+
+## The rest of the system
 
 ### 2. API (`api/`)
 
@@ -106,6 +150,10 @@ The transactions are real. They're rows from the test set, so the model never tr
 - **Timestamp:** each one gets the current time. I checked how much this matters: across the whole test set it changes at most 1 decision out of 56,746.
 
 Every probability on the screen is computed live by the model through the API. Since the dashboard knows the true answer for each transaction, it also shows whether the model got it right (fraud caught, fraud missed, or false alarm) and keeps a running recall and precision.
+
+![A caught fraud in the live feed](docs/flagged_fraud.png)
+
+The white tick on each bar is the threshold. A bar that crosses it gets flagged.
 
 ## Try it
 
@@ -178,6 +226,8 @@ dotnet test api.Tests
 
 GitHub Actions runs those tests and builds both Docker images on every push to `main`. I checked that it actually catches problems by pushing a deliberately broken test: the run went red at the test step and skipped the build.
 
+![CI runs: green, red on a deliberately broken test, then green again](docs/ci_runs.png)
+
 ## Rebuild the model yourself
 
 This part needs Python 3.12 and the dataset.
@@ -198,6 +248,7 @@ pip install -r requirements.txt
 cd src
 python final_model.py                # trains, tunes the threshold, exports the model + schema
 python export_demo_transactions.py   # rebuilds the dashboard's demo data
+python make_figures.py               # regenerates every chart in docs/ plus docs/stats.json
 ```
 
 `python train.py` runs all the model comparisons (baselines, logistic regression, XGBoost, SMOTE, cross-validation), and `notebooks/01_eda.ipynb` has the exploration.
@@ -211,7 +262,9 @@ fraud-detection-engine/
 │   ├── data_prep.py              load, clean (dedupe + hour feature), stratified split
 │   ├── train.py                  model comparisons and cross-validation
 │   ├── final_model.py            final training, threshold tuning, ONNX export
-│   └── export_demo_transactions.py
+│   ├── export_demo_transactions.py
+│   └── make_figures.py           charts and numbers used in this README
+├── docs/                         charts, screenshots and stats.json
 ├── models/
 │   ├── fraud_model.onnx          the trained model
 │   └── model_schema.json         the contract between Python and C#
