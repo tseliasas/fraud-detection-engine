@@ -1,0 +1,50 @@
+{
+  "dataset": {
+    "legit": 283253,
+    "fraud": 473,
+    "fraud_rate": 0.001667101358352777
+  },
+  "hour": {
+    "legit_share_midnight_to_6am": 8.376610309511285,
+    "fraud_share_midnight_to_6am": 24.312896405919663
+  },
+  "pr_auc_test": {
+    "Always 'not fraud'": 0.0016741268107003137,
+    "Logistic regression (unscaled)": 0.6552911895123245,
+    "Logistic regression (scaled)": 0.6714937258446254,
+    "XGBoost (class weights)": 0.8218184102739717
+  },
+  "final_model": {
+    "recall_at_threshold": 0.7473684210526316,
+    "precision_at_threshold": 0.9594594594594594,
+    "threshold": 0.9152014255523682,
+    "true_negatives": 56648,
+    "false_positives": 3,
+    "false_negatives": 24,
+    "true_positives": 71
+  },
+  "cross_validation": {
+    "Class weights": {
+      "folds": [
+        0.8217,
+        0.8677,
+        0.8088,
+        0.8673,
+        0.8601
+      ],
+      "mean": 0.8451083691436703,
+      "std": 0.024866061485859067
+    },
+    "SMOTE": {
+      "folds": [
+        0.8393,
+        0.8632,
+        0.8011,
+        0.8767,
+        0.8651
+      ],
+      "mean": 0.8490795335181783,
+      "std": 0.026883346034328244
+    }
+  }
+}
