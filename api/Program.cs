@@ -67,3 +67,4 @@ app.MapPost("/predict", (PredictRequest request, FraudPredictor predictor) =>
 });
 
 app.Run();
+public partial class Program { }

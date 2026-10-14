@@ -227,3 +227,5 @@ __marimo__/
 api/CSHARP_GUIDE.md
 dashboard/DASHBOARD_GUIDE.md
 CLAUDE.md
+api.Tests/bin/
+api.Tests/obj/
